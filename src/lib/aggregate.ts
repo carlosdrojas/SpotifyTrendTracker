@@ -85,7 +85,7 @@ export function aggregateProfiles(
       }
 
       // Genre scores
-      artist.genres.forEach((genre) => {
+      ;(artist.genres ?? []).forEach((genre) => {
         genreScores.set(genre, (genreScores.get(genre) ?? 0) + score)
       })
     })

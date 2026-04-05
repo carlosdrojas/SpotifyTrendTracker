@@ -7,11 +7,11 @@ interface Props {
 }
 
 export default function ArtistCard({ artist, index, showAccountBadge }: Props) {
-  const imageUrl = artist.images[0]?.url
+  const imageUrl = artist.images?.[0]?.url
 
   return (
     <a
-      href={artist.external_urls.spotify}
+      href={artist.external_urls?.spotify ?? '#'}
       target="_blank"
       rel="noopener noreferrer"
       className="group flex flex-col items-center gap-3 p-4 rounded-xl hover:bg-spotify-card transition-colors text-center"
@@ -39,7 +39,7 @@ export default function ArtistCard({ artist, index, showAccountBadge }: Props) {
       <div className="min-w-0 w-full">
         <p className="font-semibold text-sm truncate">{artist.name}</p>
         <p className="text-spotify-text text-xs truncate capitalize mt-0.5">
-          {artist.genres.slice(0, 2).join(' · ') || 'Artist'}
+          {(artist.genres ?? []).slice(0, 2).join(' · ') || 'Artist'}
         </p>
         {showAccountBadge && artist.accountCount > 1 && (
           <span className="inline-block mt-1 text-xs bg-spotify-green/20 text-spotify-green px-2 py-0.5 rounded-full">
