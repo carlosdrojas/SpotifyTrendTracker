@@ -127,7 +127,13 @@ export async function fetchAllAccountData(
     ...longTracks.map((t) => t.id),
   ]
   const uniqueIds = [...new Set(allTrackIds)]
-  const audioFeatures = await getAudioFeatures(accessToken, accountId, uniqueIds.slice(0, 100))
+  // Audio features endpoint is restricted for new Spotify apps — fail gracefully
+  let audioFeatures: SpotifyAudioFeatures[] = []
+  try {
+    audioFeatures = await getAudioFeatures(accessToken, accountId, uniqueIds.slice(0, 100))
+  } catch {
+    // Not available for this app — charts will be hidden
+  }
 
   const featureMap = new Map(audioFeatures.map((f) => [f.id, f]))
 
