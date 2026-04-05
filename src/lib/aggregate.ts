@@ -27,9 +27,11 @@ export function aggregateProfiles(
 
   for (const data of accountDataList) {
     const rangeData = data[timeRange]
+    if (!rangeData) continue
 
     // Tracks
-    rangeData.tracks.forEach((track, idx) => {
+    ;(rangeData.tracks ?? []).forEach((track, idx) => {
+      if (!track?.id) return
       const score = rankScore(idx + 1)
       const existing = trackScores.get(track.id)
       if (existing) {
@@ -44,9 +46,10 @@ export function aggregateProfiles(
       }
 
       // Album scores from track rankings
-      const albumId = track.album.id
+      const albumId = track.album?.id
+      if (!albumId) return
       const albumExisting = albumScores.get(albumId)
-      const albumImageUrl = track.album.images[0]?.url ?? ''
+      const albumImageUrl = track.album?.images?.[0]?.url ?? ''
       if (albumExisting) {
         albumExisting.score += score * 0.8
         albumExisting.trackCount += 1
@@ -54,10 +57,10 @@ export function aggregateProfiles(
         albumScores.set(albumId, {
           album: {
             id: albumId,
-            name: track.album.name,
-            artist: track.album.artists[0]?.name ?? '',
+            name: track.album?.name ?? '',
+            artist: track.album?.artists?.[0]?.name ?? '',
             imageUrl: albumImageUrl,
-            releaseDate: track.album.release_date,
+            releaseDate: track.album?.release_date ?? '',
             score: score * 0.8,
             accountCount: 1,
             trackCount: 1,
@@ -70,7 +73,8 @@ export function aggregateProfiles(
     })
 
     // Artists
-    rangeData.artists.forEach((artist, idx) => {
+    ;(rangeData.artists ?? []).forEach((artist, idx) => {
+      if (!artist?.id) return
       const score = rankScore(idx + 1)
       const existing = artistScores.get(artist.id)
       if (existing) {

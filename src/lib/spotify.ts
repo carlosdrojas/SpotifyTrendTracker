@@ -135,6 +135,8 @@ export async function fetchAllAccountData(
     // Not available for this app — charts will be hidden
   }
 
+  // Note: /artists batch endpoint and /audio-features are both restricted for new Spotify apps
+  // Genres are unavailable via the API for new developer apps
   const featureMap = new Map(audioFeatures.map((f) => [f.id, f]))
 
   return {

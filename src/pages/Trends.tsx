@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore'
 import { aggregateProfiles, computeEras } from '../lib/aggregate'
 import AudioFeaturesChart from '../components/AudioFeaturesChart'
-import GenreChart from '../components/GenreChart'
 import type { TimeRange } from '../types/spotify'
 import clsx from 'clsx'
 import {
@@ -66,9 +65,6 @@ export default function Trends() {
     )
   }
 
-  // Build genre overlap data (genres that appear across multiple time ranges)
-  const genreOverlap = computeGenreOverlap(profiles!)
-
   // Build artist trajectory data (artists that appear across multiple time ranges)
   const artistTrajectory = computeArtistTrajectory(profiles!)
 
@@ -126,8 +122,8 @@ export default function Trends() {
                   <p className="text-sm font-medium truncate">{era.topArtists.slice(0, 3).join(', ')}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-spotify-text mb-1">Top Genres</p>
-                  <p className="text-sm capitalize truncate">{era.topGenres.slice(0, 3).join(', ')}</p>
+                  <p className="text-xs text-spotify-text mb-1">Top Tracks</p>
+                  <p className="text-sm truncate">{era.topTracks.slice(0, 3).join(', ')}</p>
                 </div>
               </div>
 
@@ -185,22 +181,27 @@ export default function Trends() {
               />
             </div>
 
-            {/* Genre evolution */}
+            {/* Top Artists by Era */}
             <div className="bg-spotify-dark rounded-2xl p-6">
-              <h2 className="text-lg font-bold mb-1">Genre Shifts</h2>
+              <h2 className="text-lg font-bold mb-1">Top Artists by Era</h2>
               <p className="text-spotify-text text-sm mb-5">
                 {selectedEra
-                  ? `Top genres for ${ERA_LABELS[selectedEra]}`
+                  ? `Top artists for ${ERA_LABELS[selectedEra]}`
                   : 'Select an era above to drill down'}
               </p>
-              <GenreChart
-                genres={
-                  selectedEra
-                    ? profiles[selectedEra].topGenres
-                    : profiles.medium_term.topGenres
-                }
-                maxItems={10}
-              />
+              <div className="space-y-2">
+                {(selectedEra ? profiles[selectedEra] : profiles.medium_term).artists
+                  .slice(0, 10)
+                  .map((artist, i) => (
+                    <div key={artist.id} className="flex items-center gap-3">
+                      <span className="text-xs text-spotify-text w-5 text-right">{i + 1}</span>
+                      {artist.images?.[0]?.url && (
+                        <img src={artist.images[0].url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                      )}
+                      <span className="text-sm font-medium truncate">{artist.name}</span>
+                    </div>
+                  ))}
+              </div>
             </div>
           </div>
         </section>
@@ -266,33 +267,41 @@ export default function Trends() {
         </section>
       )}
 
-      {/* Genre overlap - artists in common */}
-      {genreOverlap.length > 0 && (
-        <section className="bg-spotify-dark rounded-2xl p-6">
-          <h2 className="text-lg font-bold mb-1">Consistent Genres</h2>
-          <p className="text-spotify-text text-sm mb-5">
-            Genres that have stayed in your top 20 across all time periods
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {genreOverlap.map(({ genre, count }) => (
-              <span
-                key={genre}
-                className={clsx(
-                  'px-3 py-1.5 rounded-full text-sm font-medium capitalize',
-                  count === 3
-                    ? 'bg-spotify-green text-black'
-                    : count === 2
-                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                    : 'bg-spotify-card text-spotify-text'
-                )}
-              >
-                {genre}
-                {count === 3 && <span className="ml-1.5 text-xs">✓ All eras</span>}
-              </span>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* Consistent Artists */}
+      {profiles && (() => {
+        const shortIds = new Set(profiles.short_term.artists.slice(0, 30).map(a => a.id))
+        const medIds = new Set(profiles.medium_term.artists.slice(0, 30).map(a => a.id))
+        const longIds = new Set(profiles.long_term.artists.slice(0, 30).map(a => a.id))
+        const consistent = profiles.long_term.artists.slice(0, 50).map(a => ({
+          ...a,
+          count: (shortIds.has(a.id) ? 1 : 0) + (medIds.has(a.id) ? 1 : 0) + (longIds.has(a.id) ? 1 : 0),
+        })).filter(a => a.count >= 2).sort((a, b) => b.count - a.count)
+        if (consistent.length === 0) return null
+        return (
+          <section className="bg-spotify-dark rounded-2xl p-6">
+            <h2 className="text-lg font-bold mb-1">Consistent Artists</h2>
+            <p className="text-spotify-text text-sm mb-5">
+              Artists that have stayed in your top 30 across multiple time periods
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {consistent.slice(0, 20).map(({ id, name, count }) => (
+                <span
+                  key={id}
+                  className={clsx(
+                    'px-3 py-1.5 rounded-full text-sm font-medium',
+                    count === 3
+                      ? 'bg-spotify-green text-black'
+                      : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                  )}
+                >
+                  {name}
+                  {count === 3 && <span className="ml-1.5 text-xs">✓ All eras</span>}
+                </span>
+              ))}
+            </div>
+          </section>
+        )
+      })()}
     </div>
   )
 }
@@ -320,18 +329,6 @@ type ProfilesMap = {
   long_term: ReturnType<typeof aggregateProfiles>
 }
 
-function computeGenreOverlap(profiles: ProfilesMap) {
-  const counts = new Map<string, number>()
-  for (const range of ['short_term', 'medium_term', 'long_term'] as TimeRange[]) {
-    profiles[range].topGenres.slice(0, 20).forEach(({ genre }) => {
-      counts.set(genre, (counts.get(genre) ?? 0) + 1)
-    })
-  }
-  return [...counts.entries()]
-    .filter(([, count]) => count >= 2)
-    .sort((a, b) => b[1] - a[1])
-    .map(([genre, count]) => ({ genre, count }))
-}
 
 function computeArtistTrajectory(profiles: ProfilesMap) {
   const artistRanks = new Map<string, { id: string; name: string; ranges: Set<TimeRange> }>()

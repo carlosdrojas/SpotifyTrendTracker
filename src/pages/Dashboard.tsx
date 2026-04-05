@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore'
 import { fetchAllAccountData } from '../lib/spotify'
 import { aggregateProfiles } from '../lib/aggregate'
+import type { AggregatedTrack } from '../types/spotify'
 import TrackCard from '../components/TrackCard'
 import ArtistCard from '../components/ArtistCard'
 import AlbumCard from '../components/AlbumCard'
-import GenreChart from '../components/GenreChart'
 import TimeRangeSelector from '../components/TimeRangeSelector'
 import LoadingSpinner, { SkeletonCard } from '../components/LoadingSpinner'
 import { initiateLogin } from '../lib/auth'
@@ -22,13 +22,11 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<Tab>('tracks')
   const [showCount, setShowCount] = useState(20)
 
-  // Fetch data for accounts that don't have it or it's stale (>30 min)
-  useEffect(() => {
+  const fetchAccounts = (force = false) => {
     const STALE_MS = 30 * 60 * 1000
     const needsFetch = accounts.filter(
-      (a) => !accountData[a.id] || Date.now() - accountData[a.id].fetchedAt > STALE_MS
+      (a) => force || !accountData[a.id] || Date.now() - accountData[a.id].fetchedAt > STALE_MS
     )
-
     if (needsFetch.length === 0) return
 
     setLoading(true)
@@ -47,7 +45,9 @@ export default function Dashboard() {
       }
       setLoading(false)
     })
-  }, [accounts])
+  }
+
+  useEffect(() => { fetchAccounts() }, [accounts])
 
   const selectedData = useMemo(
     () => selectedAccountIds.map((id) => accountData[id]).filter(Boolean),
@@ -75,7 +75,12 @@ export default function Dashboard() {
   ]
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 animate-fade-in">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 animate-fade-in relative">
+      {/* Signature */}
+      <div className="fixed bottom-4 right-4 opacity-40 hover:opacity-100 transition-opacity z-40">
+        <img src="/family-guy-peter-griffin.gif" alt="" className="w-14 h-14 rounded-full object-cover" />
+      </div>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
@@ -88,6 +93,14 @@ export default function Dashboard() {
         </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <TimeRangeSelector />
+          <button
+            onClick={() => fetchAccounts(true)}
+            disabled={loading}
+            title="Refresh data"
+            className="text-sm text-spotify-text hover:text-white px-3 py-2 rounded-lg hover:bg-spotify-card transition-colors border border-white/10 disabled:opacity-50"
+          >
+            {loading ? '↻ Refreshing…' : '↻ Refresh'}
+          </button>
           <button
             onClick={() => initiateLogin()}
             className="text-sm text-spotify-text hover:text-white px-3 py-2 rounded-lg hover:bg-spotify-card transition-colors border border-white/10"
@@ -136,24 +149,10 @@ export default function Dashboard() {
       {/* Stats bar */}
       {profile && !isDataLoading && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-          <StatCard label="Top Genre" value={profile.topGenres[0]?.genre ?? '—'} />
-          <StatCard
-            label="Avg. Energy"
-            value={
-              profile.avgAudioFeatures
-                ? `${Math.round(profile.avgAudioFeatures.energy * 100)}%`
-                : '—'
-            }
-          />
-          <StatCard
-            label="Avg. Mood"
-            value={
-              profile.avgAudioFeatures
-                ? moodLabel(profile.avgAudioFeatures.valence)
-                : '—'
-            }
-          />
-          <StatCard label="Genres Explored" value={String(profile.topGenres.length)} />
+          <StatCard label="#1 Artist" value={profile.artists[0]?.name ?? '—'} />
+          <StatCard label="#1 Track" value={profile.tracks[0]?.name ?? '—'} />
+          <StatCard label="Top Decade" value={topDecade(profile.tracks)} />
+          <StatCard label="Top Album" value={profile.albums[0]?.name ?? '—'} />
         </div>
       )}
 
@@ -256,12 +255,25 @@ export default function Dashboard() {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Top Genres */}
+            {/* Top Albums */}
             <div className="bg-spotify-dark rounded-xl p-5">
-              <h3 className="font-bold mb-4 text-sm uppercase tracking-wider text-spotify-text">
-                Top Genres
+              <h3 className="font-bold mb-3 text-sm uppercase tracking-wider text-spotify-text">
+                Top Albums
               </h3>
-              <GenreChart genres={profile.topGenres} maxItems={8} />
+              <div className="space-y-2">
+                {profile.albums.slice(0, 6).map((album, i) => (
+                  <div key={album.id} className="flex items-center gap-3">
+                    <span className="text-xs text-spotify-text w-4 text-right">{i + 1}</span>
+                    {album.imageUrl && (
+                      <img src={album.imageUrl} alt="" className="w-8 h-8 rounded object-cover" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium truncate">{album.name}</p>
+                      <p className="text-xs text-spotify-text truncate">{album.artist}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Top tracks quick list */}
@@ -306,12 +318,16 @@ function StatCard({ label, value }: { label: string; value: string }) {
   )
 }
 
-function moodLabel(valence: number): string {
-  if (valence >= 0.7) return 'Happy'
-  if (valence >= 0.5) return 'Upbeat'
-  if (valence >= 0.3) return 'Neutral'
-  if (valence >= 0.15) return 'Melancholic'
-  return 'Dark'
+function topDecade(tracks: AggregatedTrack[]): string {
+  const decades: Record<string, number> = {}
+  tracks.slice(0, 50).forEach((t) => {
+    const year = parseInt(t.album.release_date?.slice(0, 4) ?? '0', 10)
+    if (year > 0) {
+      const decade = `${Math.floor(year / 10) * 10}s`
+      decades[decade] = (decades[decade] ?? 0) + 1
+    }
+  })
+  return Object.entries(decades).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—'
 }
 
 function EmptyState() {

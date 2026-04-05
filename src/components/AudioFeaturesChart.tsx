@@ -38,6 +38,14 @@ export default function AudioFeaturesChart({ features }: Props) {
     return entry
   })
 
+  if (features.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-40 text-spotify-text text-sm">
+        Audio features unavailable for this app
+      </div>
+    )
+  }
+
   return (
     <ResponsiveContainer width="100%" height={320}>
       <RadarChart data={data}>

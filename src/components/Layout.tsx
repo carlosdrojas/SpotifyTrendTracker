@@ -8,6 +8,9 @@ export default function Layout() {
       <main className="flex-1 pt-16">
         <Outlet />
       </main>
+      <footer className="text-center py-4 text-spotify-text text-xs">
+        made by carlos "carlos bandz" rojas
+      </footer>
     </div>
   )
 }

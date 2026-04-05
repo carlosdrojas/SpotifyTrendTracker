@@ -116,6 +116,15 @@ export default function Landing() {
           </p>
         </div>
       </div>
+
+      {/* Signature */}
+      <div className="absolute bottom-4 right-4 opacity-60 hover:opacity-100 transition-opacity">
+        <img
+          src="/family-guy-peter-griffin.gif"
+          alt="Peter Griffin"
+          className="w-16 h-16 rounded-full object-cover"
+        />
+      </div>
     </div>
   )
 }
